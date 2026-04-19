@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>EMRE NETWORK | KALICI ASKERİ SİSTEM</title>
+    <style>
+        @import url('https://googleapis.com');
+        :root { --ana: #ff0000; --altin: #ffd700; --yazi: #0f0; --bg: #000; }
+        
+        body, html { margin: 0; padding: 0; height: 100%; background: var(--bg); color: #fff; font-family: 'Share Tech Mono', monospace; overflow: hidden; }
+
+        /* Ana Panel */
+        #panel { display: none; height: 100vh; flex-direction: row; position: relative; z-index: 10; }
+        .yan-menu { width: 260px; border-right: 1px solid #222; background: #050505; padding: 20px; display: flex; flex-direction: column; }
+        .sohbet-alani { flex-grow: 1; display: flex; flex-direction: column; padding: 20px; position: relative; }
+        .akis { flex-grow: 1; border: 1px solid #111; background: rgba(0,0,0,0.9); padding: 15px; overflow-y: auto; }
+
+        /* Mesajlar */
+        .mesaj { margin-bottom: 12px; display: flex; align-items: center; cursor: pointer; transition: 0.2s; padding: 8px; border-bottom: 1px solid #111; }
+        .mesaj:hover { background: rgba(255, 0, 0, 0.1); }
+        .m-resim { width: 45px; height: 45px; border-radius: 5px; margin-right: 12px; object-fit: cover; border: 1px solid var(--ana); }
+
+        /* KİMLİK PENCERESİ (POP-UP) */
+        #kimlik-penceresi {
+            display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            z-index: 2000; width: 350px; background: rgba(10, 10, 0, 0.95); border: 2px solid var(--altin);
+            padding: 30px; text-align: center; box-shadow: 0 0 50px var(--altin);
+        }
+        .k-resim-buyuk { width: 150px; height: 150px; border: 3px solid var(--altin); margin-bottom: 15px; object-fit: cover; }
+
+        /* Giriş */
+        #giris-ekrani { position: fixed; z-index: 1500; top: 0; left: 0; width: 100%; height: 100%; background: #000; display: flex; justify-content: center; align-items: center; }
+        .kutu { border: 2px solid var(--ana); padding: 30px; background: #0a0000; box-shadow: 0 0 30px var(--ana); text-align: center; width: 320px; }
+        input { background: #000; border: 1px solid var(--ana); color: var(--yazi); padding: 12px; width: 100%; margin: 10px 0; outline: none; box-sizing: border-box; font-family: inherit; }
+        .btn { background: var(--ana); color: #fff; border: none; padding: 10px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 10px; font-family: inherit; }
+    </style>
+</head>
+<body>
+
+<!-- GİRİŞ EKRANI -->
+<div id="giris-ekrani">
+    <div class="kutu">
+        <h1 style="color: var(--ana); margin:0;">EMRE NETWORK</h1>
+        <input type="text" id="kullanici" placeholder="KOD ADI">
+        <input type="password" id="sifre" placeholder="ŞİFRE">
+        <button class="btn" onclick="baglan()">SİSTEME GİR</button>
+    </div>
+</div>
+
+<!-- KİMLİK PENCERESİ (GİZLİ) -->
+<div id="kimlik-penceresi">
+    <h2 style="color: var(--altin); margin-top: 0;">-- ASKERİ KİMLİK --</h2>
+    <img id="k-resim" src="" class="k-resim-buyuk">
+    <div id="k-ad" style="font-size: 1.5rem; color: #fff; font-weight: bold;"></div>
+    <div id="k-rutbe" style="color: var(--altin); letter-spacing: 2px; margin-top: 5px;"></div>
+    <div id="k-madalya" style="font-size: 1.2rem; margin-top: 10px;"></div>
+    <button class="btn" style="background: #333; margin-top: 20px;" onclick="pencereKapat()">KAPAT</button>
+</div>
+
+<!-- ANA PANEL -->
+<div id="panel">
+    <div class="yan-menu">
+        <div style="text-align:center;">
+            <img id="benim-img" src="https://flaticon.com" style="width:100px; height:100px; border:2px solid var(--ana); object-fit:cover;">
+            <div id="benim-ad" style="font-weight:bold; margin-top:10px; color:var(--ana);"></div>
+            <input type="file" id="resim-yukle" style="display:none" onchange="profilGuncelle(this)">
+            <button class="btn" style="font-size:0.7rem; background:#1a1a1a;" onclick="document.getElementById('resim-yukle').click()">RESMİ GÜNCELLE</button>
+        </div>
+        <p style="font-size: 0.6rem; color: #444; margin-top: 30px; text-align: center;">BİLGİ: Mesajlara tıklayarak ajan kimliklerini sorgula.</p>
+        <button class="btn" style="background:#222; margin-top:auto;" onclick="location.reload()">SİSTEMDEN ÇIK</button>
+    </div>
+
+    <div class="sohbet-alani">
+        <div class="akis" id="akis"></div>
+        <div style="display:flex; gap:10px; margin-top:15px; background:#0a0a0a; padding:10px; border:1px solid var(--ana);">
+            <input type="text" id="mesaj-in" placeholder="Rapor yaz..." style="flex-grow:1; background:transparent; border:none; color:#fff; outline:none;" onkeydown="if(event.key==='Enter') mesajYolla()">
+            <button class="btn" style="width:80px; margin:0;" onclick="mesajYolla()">GÖNDER</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let ajan = null;
+
+    function baglan() {
+        const u = document.getElementById('kullanici').value.trim();
+        const p = document.getElementById('sifre').value;
+        if(!u || !p) return;
+
+        let rutbe = (u.toLowerCase() === "emre" && p === "emre123") ? "komutan" : "asker";
+        let madalyalar = (rutbe === "komutan") ? "🥇 🦅 🏆" : "🎖️";
+
+        // KALICI PROFİLİ LOCALSTORAGE'DAN ÇEK
+        let kayıtlıProfil = JSON.parse(localStorage.getItem("pro_v10_" + u)) || {
+            ad: u, rutbe: rutbe, resim: "https://flaticon.com", madalya: madalyalar
+        };
+
+        if(rutbe === "asker") {
+            const sp = localStorage.getItem("sp_v10_" + u);
+            if(sp && sp !== p) { alert("HATALI ŞİFRE!"); return; }
+            if(!sp) localStorage.setItem("sp_v10_" + u, p);
+        }
+
+        ajan = kayıtlıProfil;
+        document.getElementById('giris-ekrani').style.display = 'none';
+        document.getElementById('panel').style.display = 'flex';
+        document.getElementById('benim-img').src = ajan.resim;
+        document.getElementById('benim-ad').innerText = ajan.ad.toUpperCase();
+        
+        yenile();
+    }
+
+    function profilGuncelle(input) {
+        if (input.files && input.files[0]) {
+            const okuyucu = new FileReader();
+            okuyucu.onload = function(e) {
+                ajan.resim = e.target.result;
+                document.getElementById('benim-img').src = ajan.resim;
+                // PROFİLİ KALICI OLARAK KAYDET
+                localStorage.setItem("pro_v10_" + ajan.ad, JSON.stringify(ajan));
+                alert("Profil güncellendi ve sisteme mühürlendi.");
+                yenile();
+            };
+            okuyucu.readAsDataURL(input.files[0]);
+        }
+    }
+
+    function mesajYolla() {
+        const input = document.getElementById('mesaj-in');
+        if(!input.value) return;
+        
+        let db = JSON.parse(localStorage.getItem("chat_v10") || "[]");
+        // Her mesaj atıldığında güncel profil resmini kullan
+        db.push({ ad: ajan.ad, rutbe: ajan.rutbe, t: input.value, r: ajan.resim, m: ajan.madalya });
+        localStorage.setItem("chat_v10", JSON.stringify(db));
+        
+        input.value = "";
+        yenile();
+    }
+
+    function kimlikAc(isim, rutbe, resim, madalya) {
+        document.getElementById('k-resim').src = resim;
+        document.getElementById('k-ad').innerText = isim.toUpperCase();
+        document.getElementById('k-rutbe').innerText = "RÜTBE: " + rutbe.toUpperCase();
+        document.getElementById('k-madalya').innerText = madalya;
+        document.getElementById('kimlik-penceresi').style.display = 'block';
+    }
+
+    function pencereKapat() {
+        document.getElementById('kimlik-penceresi').style.display = 'none';
+    }
+
+    function yenile() {
+        const akis = document.getElementById('akis');
+        const db = JSON.parse(localStorage.getItem("chat_v10") || "[]");
+        akis.innerHTML = db.map(i => `
+            <div class="mesaj" onclick="kimlikAc('${i.ad}', '${i.rutbe}', '${i.r}', '${i.m}')">
+                <img src="${i.r}" class="m-resim" style="border-color:${i.rutbe==='komutan'?'gold':'red'}">
+                <div>
+                    <b style="color:${i.rutbe==='komutan'?'gold':'#fff'}">${i.ad}:</b>
+                    <span style="color:var(--yazi);">${i.t}</span>
+                </div>
+            </div>
+        `).join("");
+        akis.scrollTop = akis.scrollHeight;
+    }
+</script>
+</body>
+</html>
